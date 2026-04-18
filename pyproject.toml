@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-browser-harness = "admin:main"
+browser-harness = "run:main"
 
 [tool.setuptools]
 py-modules = ["run", "helpers", "daemon", "admin"]

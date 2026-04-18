@@ -1,7 +1,6 @@
 import json
 import os
 import socket
-import sys
 import time
 import urllib.request
 from pathlib import Path
@@ -138,23 +137,3 @@ def start_remote_daemon(name="remote", **create_kwargs):
         env={"BU_CDP_WS": _cdp_ws_from_url(browser["cdpUrl"]), "BU_BROWSER_ID": browser["id"]},
     )
     return browser
-
-
-def main():
-    cmd = sys.argv[1:] or ["run"]
-    if cmd[0] == "run":
-        import run
-
-        run.main()
-        return
-    if cmd[0] == "restart-daemon":
-        restart_daemon(cmd[1] if len(cmd) > 1 else None)
-        return
-    if cmd[0] == "start-remote-daemon":
-        name = cmd[1] if len(cmd) > 1 else "remote"
-        print(json.dumps(start_remote_daemon(name), indent=2))
-        return
-    raise SystemExit(
-        "Usage: browser-harness run | browser-harness restart-daemon [name] | "
-        "browser-harness start-remote-daemon [name]"
-    )

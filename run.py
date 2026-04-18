@@ -7,8 +7,8 @@ from helpers import *
 def main():
     if sys.stdin.isatty():
         sys.exit(
-            "browser-harness run reads Python from stdin. Use:\n"
-            "  browser-harness run <<'PY'\n"
+            "browser-harness reads Python from stdin. Use:\n"
+            "  browser-harness <<'PY'\n"
             "  print(page_info())\n"
             "  PY"
         )
