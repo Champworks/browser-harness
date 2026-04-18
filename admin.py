@@ -5,9 +5,20 @@ import time
 import urllib.request
 from pathlib import Path
 
-from common import load_env
 
-load_env()
+def _load_env():
+    p = Path(__file__).parent / ".env"
+    if not p.exists():
+        return
+    for line in p.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+_load_env()
 
 NAME = os.environ.get("BU_NAME", "default")
 BU_API = "https://api.browser-use.com/api/v3"

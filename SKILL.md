@@ -134,7 +134,7 @@ Chrome / Browser Use cloud -> CDP WS -> daemon.py -> /tmp/bu-<NAME>.sock -> run.
   `Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,v); el.dispatchEvent(new Event('input',{bubbles:true}))`.
 - **Radio/checkbox via React**: prefer `el.click()` over `el.checked=true` — React listens to the click event to drive state.
 - **UI-library buttons (MUI Select, dropdown overlays)**: JS `.click()` on `[role=button]` often does NOT fire the library's handler. Screenshot → `click(x,y)` via CDP instead.
-- **Keyboard listeners checking `e.key==='Enter'` on `keypress`**: prefer `press_key('Enter')`. If a site only reacts to a synthetic DOM `KeyboardEvent`, inject the narrow workaround inline with `js(...)` for that site instead of adding another global helper.
+- **Keyboard listeners checking `e.key==='Enter'` on `keypress` or app-style form handlers**: use `dispatch_key(selector, 'Enter')`. Keep `press_key()` for raw browser-level key input like Tab, Escape, arrows, or when you want the real CDP path.
 - **`alert()`/`confirm()` block the page thread.** Prefer `Page.handleJavaScriptDialog` plus `drain_events()`; see `interaction-skills/dialogs.md`.
 - **Same-origin nested iframes** don't show up as CDP targets — walk `document.querySelector('iframe').contentDocument` (or `contentWindow`) recursively. Cross-origin iframes DO appear as targets; use `iframe_target("...")`.
 - **Shadow DOM**: `document.querySelector` doesn't pierce shadow roots. Walk via `element.shadowRoot.querySelectorAll` (and recurse).

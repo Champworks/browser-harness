@@ -1,12 +1,25 @@
 """Browser control via CDP. Read, edit, extend -- this file is yours."""
 import base64, json, os, socket, time, urllib.request
+from pathlib import Path
 
-from common import INTERNAL, load_env
 
-load_env()
+def _load_env():
+    p = Path(__file__).parent / ".env"
+    if not p.exists():
+        return
+    for line in p.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+_load_env()
 
 NAME = os.environ.get("BU_NAME", "default")
 SOCK = f"/tmp/bu-{NAME}.sock"
+INTERNAL = ("chrome://", "chrome-untrusted://", "devtools://", "chrome-extension://", "about:")
 
 
 def _send(req):
@@ -145,6 +158,21 @@ def js(expression, target_id=None):
     sid = cdp("Target.attachToTarget", targetId=target_id, flatten=True)["sessionId"] if target_id else None
     r = cdp("Runtime.evaluate", session_id=sid, expression=expression, returnByValue=True, awaitPromise=True)
     return r.get("result", {}).get("value")
+
+
+_KC = {"Enter": 13, "Tab": 9, "Escape": 27, "Backspace": 8, " ": 32, "ArrowLeft": 37, "ArrowUp": 38, "ArrowRight": 39, "ArrowDown": 40}
+
+
+def dispatch_key(selector, key="Enter", event="keypress"):
+    """Dispatch a DOM KeyboardEvent on the matched element.
+
+    Use this when a site reacts to synthetic DOM key events on an element more reliably
+    than to raw CDP input events.
+    """
+    kc = _KC.get(key, ord(key) if len(key) == 1 else 0)
+    js(
+        f"(()=>{{const e=document.querySelector({json.dumps(selector)});if(e){{e.focus();e.dispatchEvent(new KeyboardEvent({json.dumps(event)},{{key:{json.dumps(key)},code:{json.dumps(key)},keyCode:{kc},which:{kc},bubbles:true}}));}}}})()"
+    )
 
 def upload_file(selector, path):
     """Set files on a file input via CDP DOM.setFileInputFiles. `path` is an absolute filepath (use tempfile.mkstemp if needed)."""
