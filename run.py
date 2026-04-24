@@ -1,7 +1,9 @@
+import json
 import sys
 
 from admin import (
     _version,
+    daemon_health,
     ensure_daemon,
     list_cloud_profiles,
     list_local_profiles,
@@ -31,6 +33,7 @@ Helpers are pre-imported. The daemon auto-starts and connects to the running bro
 Commands:
   browser-harness --version        print the installed version
   browser-harness --doctor         diagnose install, daemon, and browser state
+  browser-harness --health         print daemon health/diagnostics as JSON
   browser-harness --setup          interactively attach to your running browser
   browser-harness --update [-y]    pull the latest version (agents: pass -y)
 """
@@ -46,6 +49,10 @@ def main():
         return
     if args and args[0] == "--doctor":
         sys.exit(run_doctor())
+    if args and args[0] in {"--health", "--diagnostics"}:
+        health = daemon_health()
+        print(json.dumps(health, indent=2, sort_keys=True))
+        sys.exit(0 if health.get("reachable") and health.get("session_known") else 1)
     if args and args[0] == "--setup":
         sys.exit(run_setup())
     if args and args[0] == "--update":

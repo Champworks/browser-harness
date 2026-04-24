@@ -59,6 +59,13 @@ def log(msg):
     open(LOG, "a").write(f"{msg}\n")
 
 
+def last_log_line():
+    try:
+        return Path(LOG).read_text().strip().splitlines()[-1]
+    except (FileNotFoundError, IndexError):
+        return None
+
+
 def get_ws_url():
     if url := os.environ.get("BU_CDP_WS"):
         return url
@@ -174,6 +181,29 @@ class Daemon:
             except Exception: pass
             return {"session_id": self.session}
         if meta == "pending_dialog": return {"dialog": self.dialog}
+        if meta == "health":
+            session_known, session_error = False, None
+            if self.session:
+                try:
+                    await asyncio.wait_for(
+                        self.cdp.send_raw("Page.getFrameTree", session_id=self.session),
+                        timeout=3,
+                    )
+                    session_known = True
+                except Exception as e:
+                    session_error = str(e)
+            return {
+                "reachable": True,
+                "name": NAME,
+                "pid": os.getpid(),
+                "remote": bool(REMOTE_ID),
+                "browser_id": REMOTE_ID,
+                "paths": {"sock": SOCK, "pid": PID, "log": LOG},
+                "session_id": self.session,
+                "session_known": session_known,
+                "session_error": session_error,
+                "last_log_line": last_log_line(),
+            }
         if meta == "shutdown":    self.stop.set(); return {"ok": True}
 
         method = req["method"]

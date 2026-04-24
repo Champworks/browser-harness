@@ -5,7 +5,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from runtime_paths import runtime_name, runtime_path
+from runtime_paths import runtime_dir, runtime_name, runtime_path, sanitize_name
 
 
 def _load_env():
@@ -40,6 +40,78 @@ def _log_tail(name):
         return Path(p).read_text().strip().splitlines()[-1]
     except (FileNotFoundError, IndexError):
         return None
+
+
+def _read_pid(name):
+    try:
+        return int(runtime_path("pid", name or NAME).read_text().strip())
+    except (FileNotFoundError, ValueError):
+        return None
+
+
+def _daemon_request(req, name=None, timeout=1):
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        s.settimeout(timeout)
+        s.connect(_paths(name)[0])
+        s.sendall((json.dumps(req) + "\n").encode())
+        data = b""
+        while not data.endswith(b"\n"):
+            chunk = s.recv(1 << 16)
+            if not chunk:
+                break
+            data += chunk
+        return json.loads(data or b"{}")
+    finally:
+        s.close()
+
+
+def daemon_health(name=None):
+    """Return read-only daemon diagnostics without starting or stopping anything."""
+    safe_name = runtime_name() if name is None else sanitize_name(name)
+    sock, pid_path = _paths(name)
+    base = {
+        "reachable": False,
+        "name": safe_name,
+        "runtime_dir": str(runtime_dir()),
+        "paths": {"sock": sock, "pid": pid_path, "log": str(runtime_path("log", name or NAME))},
+        "pid": _read_pid(name),
+        "session_id": None,
+        "session_known": False,
+        "session_error": None,
+        "last_log_line": _log_tail(name),
+    }
+    try:
+        resp = _daemon_request({"meta": "health"}, name=name, timeout=2)
+    except (FileNotFoundError, ConnectionRefusedError, socket.timeout, json.JSONDecodeError, OSError) as e:
+        base["error"] = str(e)
+        return base
+    if resp.get("error"):
+        base["reachable"] = True
+        base["error"] = resp["error"]
+        # Older daemons do not know meta:health; salvage what we can through
+        # the existing meta:session/CDP request path so the flag is still useful
+        # before a daemon restart picks up the newer protocol.
+        if resp["error"] in {"'method'", '"method"'}:
+            base["protocol"] = "legacy"
+            base["health_error"] = base.pop("error")
+            try:
+                session = _daemon_request({"meta": "session"}, name=name, timeout=2).get("session_id")
+                base["session_id"] = session
+                if session:
+                    probe = _daemon_request(
+                        {"method": "Page.getFrameTree", "session_id": session},
+                        name=name,
+                        timeout=3,
+                    )
+                    base["session_known"] = "result" in probe
+                    base["session_error"] = probe.get("error")
+            except Exception as e:
+                base["session_error"] = str(e)
+        return base
+    if "runtime_dir" not in resp:
+        resp["runtime_dir"] = str(runtime_dir())
+    return {**base, **resp, "paths": {**base["paths"], **resp.get("paths", {})}}
 
 
 def daemon_alive(name=None):
