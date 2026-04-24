@@ -4,6 +4,7 @@ from collections import deque
 from pathlib import Path
 
 from cdp_use.client import CDPClient
+from runtime_paths import runtime_name, runtime_path
 
 
 def _load_env():
@@ -20,10 +21,10 @@ def _load_env():
 
 _load_env()
 
-NAME = os.environ.get("BU_NAME", "default")
-SOCK = f"/tmp/bu-{NAME}.sock"
-LOG = f"/tmp/bu-{NAME}.log"
-PID = f"/tmp/bu-{NAME}.pid"
+NAME = runtime_name()
+SOCK = str(runtime_path("sock", NAME))
+LOG = str(runtime_path("log", NAME))
+PID = str(runtime_path("pid", NAME))
 BUF = 500
 PROFILES = [
     Path.home() / "Library/Application Support/Google/Chrome",
